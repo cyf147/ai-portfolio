@@ -1,0 +1,2011 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>拿性陈 · AI 产品经理 — 智能客服 RAG + Agent 在线原型与自动化流程工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Inter"', '"Noto Sans SC"', 'system-ui', 'sans-serif'],
+        serif: ['"Noto Serif SC"', 'serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+      },
+      colors: {
+        brand: {
+          50: '#eef7f4',
+          100: '#d7ede6',
+          200: '#b2dcd0',
+          500: '#157f66',
+          600: '#0b5d4a',
+          700: '#094b3c',
+          900: '#052b22'
+        }
+      }
+    }
+  }
+};
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+    background-color: #f6f7f5;
+    color: #181c18;
+    margin: 0;
+  }
+  .serif-title { font-family: 'Noto Serif SC', serif; }
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd0c9; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9aa39a; }
+
+  /* DAG Node pulse & connection animations */
+  @keyframes pulseRing {
+    0% { box-shadow: 0 0 0 0 rgba(11, 93, 74, 0.45); }
+    70% { box-shadow: 0 0 0 8px rgba(11, 93, 74, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(11, 93, 74, 0); }
+  }
+  .node-active {
+    animation: pulseRing 1.4s infinite;
+    border-color: #0b5d4a !important;
+    background-color: #eef7f4 !important;
+  }
+  .node-visited {
+    border-color: #157f66 !important;
+    background-color: #f4faf8 !important;
+  }
+  .node-alert {
+    border-color: #b42318 !important;
+    background-color: #fef3f2 !important;
+  }
+</style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-brand-600 selection:text-white">
+
+<!-- Top Navigation Header -->
+<header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-stone-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:h-16 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center font-serif font-bold text-base shrink-0 shadow-sm">
+        陈
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm sm:text-base text-stone-900 truncate">拿性陈 · AI 产品经理交互原型工作台</span>
+          <span class="hidden xl:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200 shrink-0">
+            二手电商 C2C · 智能客服 RAG + Agent
+          </span>
+        </div>
+        <p class="text-xs text-stone-500 truncate">从静态 PRD 作品集升级为可在线体验的 AI 客服工作台与自动化编排流水线</p>
+      </div>
+    </div>
+
+    <!-- Main View Switcher Tabs (Only 1 & 2, clean fit without scrollbar) -->
+    <nav class="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200 shrink-0" aria-label="核心工作台切换">
+      <button type="button" data-tab="workbench" class="nav-tab px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-brand-600 text-white shadow-sm">
+        1. 智能客服 Agent 试验台
+      </button>
+      <button type="button" data-tab="automation" class="nav-tab px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition whitespace-nowrap text-stone-700 hover:bg-stone-200/70">
+        2. 主动识别与自动化流程
+      </button>
+    </nav>
+  </div>
+</header>
+
+<!-- Live Session Telemetry Ribbon -->
+<div class="bg-stone-900 text-stone-200 border-b border-stone-800 text-xs">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-4">
+      <span class="inline-flex items-center gap-1.5 font-medium text-emerald-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        实时指标大盘（按原 PRD 监控公式计算）
+      </span>
+      <span>总会话量: <strong id="metricTotalSessions" class="text-white font-mono">1</strong></span>
+      <span>有效会话: <strong id="metricValidSessions" class="text-white font-mono">1</strong></span>
+      <span>提问总数: <strong id="metricTotalQuestions" class="text-white font-mono">0</strong></span>
+      <span>匹配率: <strong id="metricMatchRate" class="text-emerald-300 font-mono">100%</strong></span>
+      <span>完全匹配率: <strong id="metricExactRate" class="text-emerald-300 font-mono">100%</strong></span>
+      <span title="解决率 ＝ 有效会话解决量 ÷（有效会话量 − 自定义拦截词转人工量 − 情绪识别转人工量）">
+        PRD 解决率: <strong id="metricResolutionRate" class="text-amber-300 font-mono">100%</strong>
+      </span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-stone-400">当前测试订单:</span>
+      <span id="ribbonCurrentOrder" class="px-2 py-0.5 rounded bg-stone-800 text-emerald-300 font-mono">ORD-2026-001 · 二手手机(官方验)</span>
+    </div>
+  </div>
+</div>
+
+<!-- Main Workspace Container -->
+<main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+
+  <!-- ========================================== -->
+  <!-- TAB 1: 智能客服 Agent 试验台 (Workbench) -->
+  <!-- ========================================== -->
+  <section id="tab-workbench" class="tab-panel space-y-6">
+    <!-- Top Banner / Scenario Switcher -->
+    <div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 shadow-sm">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-brand-600">路径 01 · 问题预判与上下文感知</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">检索式优先 · 宁可不答不能答错</span>
+          </div>
+          <h1 class="serif-title text-lg sm:text-xl font-bold text-stone-900 mt-1">
+            切换不同 C2C 交易上下文，实时观测 RAG + Agent 状态机与转人工护栏
+          </h1>
+          <p class="text-xs sm:text-sm text-stone-600 mt-0.5">
+            原 PRD 核心机制：根据「订单状态 + 交易状态 + 已有工单 + 上次诉求 + 入口参数」动态生成预判问题、对 RAG 检索结果做场景重排（Rerank），并驱动多轮填槽与工具调用。
+          </p>
+        </div>
+
+        <!-- Order Context Persona Selector -->
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <label for="orderSelect" class="text-xs font-semibold text-stone-500">测试订单场景：</label>
+          <select id="orderSelect" class="text-xs sm:text-sm font-medium bg-stone-50 border border-stone-300 rounded-xl px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-brand-600">
+            <option value="ord_001">场景 A：官方验二手手机 · 运输中正常（可测物流/退款填槽/验机图谱）</option>
+            <option value="ord_002">场景 B：官方验镜头 · 分拨中心滞留 54h（可测疑似丢件自动建单）</option>
+            <option value="ord_003">场景 C：普通 C2C 游戏机 · 卖家 78h 未发货（可测超时未发货主动取消）</option>
+            <option value="ord_004">场景 D：C2C 显卡纠纷 · 买家第 3 次申诉（可测多次申诉触发仲裁介入）</option>
+          </select>
+          <button type="button" id="resetSessionBtn" class="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 transition">
+            重置会话
+          </button>
+        </div>
+      </div>
+
+      <!-- Context Signals Bar -->
+      <div id="contextSignalsBar" class="mt-4 pt-3 border-t border-stone-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </div>
+
+    <!-- Main 12-Col Interactive Split View -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left 5 Cols: User / Bot Chat Simulator + Self-Service Board -->
+      <div class="lg:col-span-5 bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+        <!-- Simulator Header -->
+        <div class="px-4 py-3 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-brand-600"></span>
+            <strong class="text-sm text-stone-900">智能客服客户端 · 实时对话模拟</strong>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" id="toggleServiceBoardBtn" class="text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 hover:border-brand-600 hover:text-brand-600 font-medium transition">
+              服务进度板 (<span id="ticketCountBadge">0</span>)
+            </button>
+            <button type="button" id="directHumanBtn" class="text-xs px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold transition">
+              一键转人工
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Service Progress Board (Path 02: 服务工具) -->
+        <div id="serviceBoardPanel" class="hidden bg-amber-50/70 border-b border-amber-200 px-4 py-3 text-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-900">路径 02 · 服务进度信息板与自助工具</span>
+            <button type="button" id="closeServiceBoardBtn" class="text-amber-800 hover:underline">收起</button>
+          </div>
+          <div id="serviceBoardList" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Path 01: Predicted Questions ("猜你想问") -->
+        <div class="px-4 py-2.5 bg-brand-50/50 border-b border-stone-200">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-semibold text-brand-700">问题预判 · 猜你想问（基于当前订单状态动态重排）：</span>
+          </div>
+          <div id="predictedChips" class="flex flex-wrap gap-1.5">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Chat Messages Scroll Container -->
+        <div id="chatViewport" class="p-4 space-y-3.5 overflow-y-auto h-[420px] bg-stone-50/40" aria-live="polite">
+          <!-- Messages rendered here -->
+        </div>
+
+        <!-- Satisfaction Feedback Bar -->
+        <div id="feedbackBar" class="hidden px-4 py-2.5 bg-white border-t border-stone-200 flex items-center justify-between gap-2 text-xs">
+          <span class="text-stone-600 font-medium">本轮回答是否解决了你的问题？（参评计入 PRD 满意度公式）</span>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" id="fbSolvedBtn" class="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold hover:bg-emerald-100 transition">
+              ✓ 已解决
+            </button>
+            <button type="button" id="fbUnsolvedBtn" class="px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 font-semibold hover:bg-rose-100 transition">
+              ✕ 没解决，转人工
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Composer -->
+        <form id="chatForm" class="p-3 bg-white border-t border-stone-200 flex gap-2">
+          <label for="chatInput" class="sr-only">输入你的问题</label>
+          <input id="chatInput" type="text" placeholder="输入问题：如 我的包裹到哪了 / 我要退款 / 验机报告 / 转人工..." autocomplete="off" class="flex-1 min-w-0 text-sm px-3.5 py-2 rounded-xl border border-stone-300 bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-600" />
+          <button type="submit" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition shrink-0">
+            发送
+          </button>
+        </form>
+
+        <!-- Quick Rule Triggers Footer -->
+        <div class="px-4 py-2.5 bg-stone-100 border-t border-stone-200">
+          <p class="text-[11px] font-semibold text-stone-500 mb-1.5">一键触发 PRD 核心验证用例（点击立即执行）：</p>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-quick="我的包裹到哪了？" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              物流 RAG + 丢件检测
+            </button>
+            <button type="button" data-quick="我要申请退款" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              Agent 多轮填槽退款
+            </button>
+            <button type="button" data-quick="验机报告怎么看？属于哪个商家？" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              二维知识图谱查询
+            </button>
+            <button type="button" data-quick="二手平板能分期付款吗？" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              低相似度 → 3 个候选问题
+            </button>
+            <button type="button" data-quick="__repeat_3x__" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              同问第 3 次 → 自动转人工
+            </button>
+            <button type="button" data-quick="你们客服太差了，等太久我很生气！" class="quick-trigger text-xs px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-brand-600 hover:text-brand-600 transition">
+              负向情绪识别 → 转人工
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right 7 Cols: Live Visual DAG Pipeline + RAG & Agent State Inspector -->
+      <div class="lg:col-span-7 space-y-5">
+
+        <!-- Live Interactive Pipeline DAG Card -->
+        <div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-600">实时管线拓扑 · Live Pipeline DAG</span>
+              <h2 class="text-base font-bold text-stone-900">一次问答走完的 RAG + Agent + 护栏工作流</h2>
+            </div>
+            <span id="activeRouteBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 border border-stone-200">
+              等待输入触发管线
+            </span>
+          </div>
+
+          <!-- Responsive Visual Pipeline Flow -->
+          <div class="overflow-x-auto pb-2">
+            <div class="min-w-[640px] grid grid-cols-5 gap-2.5 items-center text-xs">
+              <!-- Node 1 -->
+              <div id="dag-input" class="dag-node rounded-xl border-2 border-stone-200 bg-stone-50 p-2.5 transition">
+                <div class="font-bold text-stone-900 flex items-center justify-between">
+                  <span>01 输入与上下文</span>
+                  <span class="text-[10px] font-mono text-stone-400">CTX</span>
+                </div>
+                <p id="dag-input-desc" class="text-[11px] text-stone-500 mt-1 truncate">订单+工单+入口参数</p>
+              </div>
+
+              <!-- Node 2 -->
+              <div id="dag-intent" class="dag-node rounded-xl border-2 border-stone-200 bg-stone-50 p-2.5 transition">
+                <div class="font-bold text-stone-900 flex items-center justify-between">
+                  <span>02 意图与情绪</span>
+                  <span class="text-[10px] font-mono text-stone-400">NLU</span>
+                </div>
+                <p id="dag-intent-desc" class="text-[11px] text-stone-500 mt-1 truncate">拦截词 / 情绪 / 重复数</p>
+              </div>
+
+              <!-- Node 3 -->
+              <div id="dag-retrieve" class="dag-node rounded-xl border-2 border-stone-200 bg-stone-50 p-2.5 transition">
+                <div class="font-bold text-stone-900 flex items-center justify-between">
+                  <span>03 混合检索/图谱</span>
+                  <span class="text-[10px] font-mono text-stone-400">RAG/KG</span>
+                </div>
+                <p id="dag-retrieve-desc" class="text-[11px] text-stone-500 mt-1 truncate">向量+关键词+Freshness</p>
+              </div>
+
+              <!-- Node 4 -->
+              <div id="dag-rerank" class="dag-node rounded-xl border-2 border-stone-200 bg-stone-50 p-2.5 transition">
+                <div class="font-bold text-stone-900 flex items-center justify-between">
+                  <span>04 场景重排/分级</span>
+                  <span class="text-[10px] font-mono text-stone-400">RANK</span>
+                </div>
+                <p id="dag-rerank-desc" class="text-[11px] text-stone-500 mt-1 truncate">高 / 中 / 低置信阈值</p>
+              </div>
+
+              <!-- Node 5 (Branching Outcomes) -->
+              <div class="space-y-1.5">
+                <div id="dag-out-rag" class="dag-node rounded-lg border-2 border-stone-200 bg-stone-50 px-2.5 py-1.5 transition">
+                  <div class="font-bold text-stone-900 text-[11px]">5A. 带引用生成</div>
+                  <div class="text-[10px] text-stone-500">只答检索到的事实</div>
+                </div>
+                <div id="dag-out-agent" class="dag-node rounded-lg border-2 border-stone-200 bg-stone-50 px-2.5 py-1.5 transition">
+                  <div class="font-bold text-stone-900 text-[11px]">5B. Agent 填槽/工具</div>
+                  <div class="text-[10px] text-stone-500">确认后调接口/建单</div>
+                </div>
+                <div id="dag-out-human" class="dag-node rounded-lg border-2 border-stone-200 bg-stone-50 px-2.5 py-1.5 transition">
+                  <div class="font-bold text-stone-900 text-[11px]">5C. 候选兜底/转人工</div>
+                  <div class="text-[10px] text-stone-500">5大规则+携带上下文</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Guardrail & Confidence Status Bar -->
+          <div class="mt-3 pt-3 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-3">
+              <span>置信度分级: <strong id="inspectorConfidence" class="text-stone-800">待命</strong></span>
+              <span>知识 Freshness: <strong id="inspectorFreshness" class="text-emerald-700">生效中（未过期）</strong></span>
+              <span>同一意图连问次数: <strong id="inspectorRepeatCount" class="font-mono text-stone-800">0 / 3</strong></span>
+            </div>
+            <span class="text-stone-400">护栏原则：无引用不输出事实 · 不可逆操作强制先填槽再确认</span>
+          </div>
+        </div>
+
+        <!-- Two-Column Inspector: Agent State Machine + Trace Steps -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          <!-- Agent Slot-Filling & Tool Execution Inspector -->
+          <div class="bg-white rounded-2xl border border-stone-200 p-4 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-brand-600">Agent 状态机与槽位监控</span>
+                <span id="agentStateBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-stone-100 text-stone-700">IDLE</span>
+              </div>
+              <p class="text-xs text-stone-500 mb-3">
+                对应原 PRD 第 03 节：识别意图后，先填槽（优先上下文自动带入）、再二次确认、最后调用工具回写会话。
+              </p>
+
+              <!-- Slots Table -->
+              <div class="border border-stone-200 rounded-xl overflow-hidden text-xs mb-3">
+                <div class="bg-stone-50 px-3 py-1.5 font-semibold text-stone-700 border-b border-stone-200 flex justify-between">
+                  <span>槽位字段 (Slot)</span>
+                  <span>当前值 / 状态</span>
+                </div>
+                <div id="slotTableBody" class="divide-y divide-stone-100">
+                  <div class="px-3 py-2 flex justify-between">
+                    <span class="font-mono text-stone-600">biz_scene (业务场景)</span>
+                    <span id="slotSceneVal" class="font-medium text-stone-900">官方验订单</span>
+                  </div>
+                  <div class="px-3 py-2 flex justify-between">
+                    <span class="font-mono text-stone-600">order_no (订单号)</span>
+                    <span id="slotOrderVal" class="font-mono text-stone-400">未填槽</span>
+                  </div>
+                  <div class="px-3 py-2 flex justify-between">
+                    <span class="font-mono text-stone-600">refund_reason (原因)</span>
+                    <span id="slotReasonVal" class="font-mono text-stone-400">未填槽</span>
+                  </div>
+                  <div class="px-3 py-2 flex justify-between">
+                    <span class="font-mono text-stone-600">user_confirm (二次确认)</span>
+                    <span id="slotConfirmVal" class="font-mono text-stone-400">待确认</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Last Tool Payload Console -->
+            <div>
+              <div class="text-xs font-semibold text-stone-700 mb-1 flex items-center justify-between">
+                <span>最近一次工具调用 / 交接载荷 (JSON)：</span>
+                <span id="lastToolName" class="font-mono text-[11px] text-brand-600">none</span>
+              </div>
+              <pre id="toolPayloadBox" class="bg-stone-900 text-emerald-300 font-mono text-[11px] p-3 rounded-xl overflow-x-auto max-h-36 leading-relaxed">{
+  "status": "waiting_for_query",
+  "available_tools": [
+    "query_order", "query_logistics",
+    "apply_refund", "create_ticket",
+    "call_seller", "transfer_human"
+  ]
+}</pre>
+            </div>
+          </div>
+
+          <!-- Step-by-Step Decision Trace Panel -->
+          <div class="bg-white rounded-2xl border border-stone-200 p-4 shadow-sm flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-brand-600">全链路决策追踪 · Trace Log</span>
+              <span class="text-[11px] text-stone-400">置信度仅分 高/中/低</span>
+            </div>
+            <p class="text-xs text-stone-500 mb-3">
+              透明展示每一轮回答背后的检索命中片段、重排依据与护栏拦截原因。
+            </p>
+            <div id="traceList" class="space-y-2.5 flex-1 overflow-y-auto max-h-[310px] pr-1">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================== -->
+  <!-- TAB 2: 主动识别与自动化流程 (Automation Flow) -->
+  <!-- ========================================== -->
+  <section id="tab-automation" class="tab-panel hidden space-y-6">
+    <div class="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-brand-600">不等用户开口 · 主动识别规则引擎 + 多步自动化编排</span>
+          <h2 class="serif-title text-xl font-bold text-stone-900 mt-1">
+            把原 PRD 的「体验断层主动识别」与「复杂售后闭环」转化为可配置、可回放的自动化工作流
+          </h2>
+          <p class="text-xs sm:text-sm text-stone-600 mt-1">
+            原 PRD 指出：智能客服的壁垒在于把断掉的服务流程接回去。下方可以调整主动触发阈值、选择 4 条核心自动化流水线并单步/全自动演练每个节点的输入输出与回流评估。
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" id="runFullFlowBtn" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition">
+            ▶ 一键自动运行当前流程
+          </button>
+          <button type="button" id="stepFlowBtn" class="px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 hover:bg-stone-50 text-stone-800 text-xs sm:text-sm font-semibold transition">
+            单步推进 →
+          </button>
+          <button type="button" id="resetFlowBtn" class="px-3 py-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 text-stone-500 text-xs sm:text-sm font-medium transition">
+            重置
+          </button>
+        </div>
+      </div>
+
+      <!-- Workflow Selector Pills -->
+      <div class="mt-5 pt-4 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <button type="button" data-flow="lost_pkg" class="flow-card text-left p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/60 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-brand-700">流程 01 · 物流延伸闭环</span>
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-brand-100 text-brand-800">create_ticket</span>
+          </div>
+          <div class="font-bold text-sm text-stone-900 mt-1">包裹疑似丢失 → 自动核实建单</div>
+          <p class="text-xs text-stone-600 mt-1">查物流延伸 → 核对停留时长阈值 → 生成网点核实工单 → 超容忍时长主动回访</p>
+        </button>
+
+        <button type="button" data-flow="unshipped" class="flow-card text-left p-3.5 rounded-xl border-2 border-stone-200 bg-white hover:border-stone-300 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-700">流程 02 · 主动识别规则 A</span>
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">call_seller</span>
+          </div>
+          <div class="font-bold text-sm text-stone-900 mt-1">卖家超时未发货 → 外呼与自动取消</div>
+          <p class="text-xs text-stone-600 mt-1">监控等待时长 &ge; 阈值 → 自动外呼卖家确认 → 触发取消交易与极速退款 → 进度同步</p>
+        </button>
+
+        <button type="button" data-flow="arbitration" class="flow-card text-left p-3.5 rounded-xl border-2 border-stone-200 bg-white hover:border-stone-300 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-700">流程 03 · 主动识别规则 B</span>
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">arbitration</span>
+          </div>
+          <div class="font-bold text-sm text-stone-900 mt-1">同一交易多次申诉 → 主动仲裁介入</div>
+          <p class="text-xs text-stone-600 mt-1">监控申诉次数 &ge; 阈值 → 汇总历史凭证与验机报告 → 触发平台仲裁工单 → 专员跟进</p>
+        </button>
+
+        <button type="button" data-flow="scrm_funnel" class="flow-card text-left p-3.5 rounded-xl border-2 border-stone-200 bg-white hover:border-stone-300 transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-indigo-700">流程 04 · PRD 延展底座</span>
+            <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">SCRM 联动</span>
+          </div>
+          <div class="font-bold text-sm text-stone-900 mt-1">私域 SCRM：先解决 → 再培育转化</div>
+          <p class="text-xs text-stone-600 mt-1">共享统一知识库 → IM 会话助手辅助答疑 → 售后解决后一键加微 → 商机漏斗归因</p>
+        </button>
+      </div>
+    </div>
+
+    <!-- Configurable Rule Thresholds + Interactive Step Execution Canvas -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left 4 Cols: Configurable Rule Parameters -->
+      <div class="lg:col-span-4 bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-brand-600">可配置规则参数 · Rule Engine</span>
+          <h3 class="text-base font-bold text-stone-900 mt-0.5">主动触发阈值与容忍时长配置</h3>
+          <p class="text-xs text-stone-500 mt-1">
+            对应原 PRD 升级点：将触发条件与参数做成可配置规则，调节下方滑块后运行流程，将实时改变节点判定结论。
+          </p>
+        </div>
+
+        <div class="space-y-3 pt-2 border-t border-stone-100 text-xs">
+          <div>
+            <div class="flex justify-between font-semibold text-stone-800 mb-1">
+              <label for="paramStallHours">物流节点停滞判定阈值（小时）</label>
+              <span id="paramStallHoursVal" class="font-mono text-brand-600">48h</span>
+            </div>
+            <input id="paramStallHours" type="range" min="24" max="72" step="6" value="48" class="w-full accent-brand-600" />
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>24h (激进)</span>
+              <span>当前测试单停滞: 54h</span>
+              <span>72h (保守)</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between font-semibold text-stone-800 mb-1">
+              <label for="paramUnshippedHours">卖家未发货自动取消阈值（小时）</label>
+              <span id="paramUnshippedHoursVal" class="font-mono text-brand-600">72h</span>
+            </div>
+            <input id="paramUnshippedHours" type="range" min="24" max="96" step="12" value="72" class="w-full accent-brand-600" />
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>24h</span>
+              <span>当前测试单等待: 78h</span>
+              <span>96h</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between font-semibold text-stone-800 mb-1">
+              <label for="paramAppealCount">同一 C2C 交易申诉仲裁阈值（次）</label>
+              <span id="paramAppealCountVal" class="font-mono text-brand-600">3 次</span>
+            </div>
+            <input id="paramAppealCount" type="range" min="1" max="5" step="1" value="3" class="w-full accent-brand-600" />
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>1 次</span>
+              <span>当前测试单已申诉: 3 次</span>
+              <span>5 次</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between font-semibold text-stone-800 mb-1">
+              <label for="paramSlaHours">工单超容忍时长主动回访（小时）</label>
+              <span id="paramSlaHoursVal" class="font-mono text-brand-600">24h</span>
+            </div>
+            <input id="paramSlaHours" type="range" min="6" max="48" step="6" value="24" class="w-full accent-brand-600" />
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-stone-50 border border-stone-200 text-xs space-y-1.5">
+          <div class="font-bold text-stone-800">可逆程度与确认护栏（原 PRD 排序）</div>
+          <p class="text-stone-600">
+            1. 专属定制答案（只读） → 2. 链接到自助工具页 → 3. 生成工单跟进 → 4. 自动外呼协商 → 5. 调用退款/取消接口（不可逆，强制二次确认）。
+          </p>
+        </div>
+      </div>
+
+      <!-- Right 8 Cols: Visual Step-by-Step Pipeline Execution -->
+      <div class="lg:col-span-8 bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span id="flowHeaderKicker" class="text-xs font-bold uppercase tracking-wider text-brand-600">流程 01 · 执行画布</span>
+            <h3 id="flowHeaderTitle" class="text-lg font-bold text-stone-900">包裹疑似丢失：从物流查询延伸到自动建单与回访闭环</h3>
+          </div>
+          <span id="flowStatusPill" class="text-xs font-semibold px-3 py-1 rounded-full bg-stone-100 text-stone-700">
+            就绪 · 点击上方「一键自动运行」或「单步推进」
+          </span>
+        </div>
+
+        <!-- 5-Step Pipeline Cards -->
+        <div id="flowStepsContainer" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Active Step Input / Output / API Payload Inspector -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div class="rounded-xl border border-stone-200 bg-stone-50 p-3.5">
+            <div class="text-xs font-bold text-stone-800 mb-1.5 flex items-center justify-between">
+              <span>当前节点执行日志与判定依据</span>
+              <span id="flowStepIndexBadge" class="font-mono text-brand-600">Step 0 / 5</span>
+            </div>
+            <p id="flowStepNarrative" class="text-xs text-stone-600 leading-relaxed">
+              点击「一键自动运行当前流程」或「单步推进」，即可在此查看每个自动化节点如何读取交易上下文、对比阈值配置、调用业务接口并把结果写回「服务进度信息板」。
+            </p>
+            <div class="mt-3 pt-2.5 border-t border-stone-200/80 flex items-center justify-between">
+              <span class="text-[11px] text-stone-500">可将此自动化结果同步至 Tab 1 客户端服务进度板：</span>
+              <button type="button" id="syncToWorkbenchBtn" class="text-xs font-semibold text-brand-600 hover:underline">
+                同步工单至客服试验台 →
+              </button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-stone-800 bg-stone-900 p-3.5 text-xs">
+            <div class="font-mono text-[11px] text-stone-400 mb-1.5 flex justify-between">
+              <span>AUTOMATION_BUS_EVENT.json</span>
+              <span id="flowApiTag" class="text-emerald-400">READY</span>
+            </div>
+            <pre id="flowJsonOutput" class="font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-40 leading-relaxed">{
+  "workflow_id": "lost_pkg",
+  "trigger_mode": "proactive_or_extended",
+  "status": "idle"
+}</pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="mt-auto border-t border-stone-200 bg-white py-4 text-xs text-stone-500">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+    <span><b>匿名化与来源说明：</b>基于作者本人撰写的二手电商 C2C 平台智能客服 PRD 构建，订单、物流与知识库片段均为演示用结构化示例数据。</span>
+    <span>在线交互原型 · 浏览器本地状态机驱动</span>
+  </div>
+</footer>
+
+<script>
+(function() {
+  "use strict";
+
+  // ==========================================
+  // 1. GROUNDED DATA: ORDERS, KB CHUNKS, FLOWS
+  // ==========================================
+  var ORDERS = {
+    ord_001: {
+      id: "ORD-2026-001",
+      item: "iPhone 15 Pro 256G · 官方验",
+      scene: "官方验订单",
+      orderStatus: "已发货 · 运输中",
+      tradeStatus: "正常担保交易",
+      lastAppeal: "咨询发货时效（已解决）",
+      ticket: "无进行中工单",
+      entryParam: "订单详情页 (order_detail)",
+      stallHours: 6,
+      unshippedHours: 0,
+      appealCount: 0,
+      logisticsNode: "包裹已到达【华东分拨中心】，正发往您所在城市，预计 1–2 天送达",
+      inspectionResult: "官方验机通过 · 电池效率 96% · 屏幕外观无划痕 · 归属商家：严选数码仓 #A108",
+      guesses: ["我的包裹到哪了？", "我要申请退款", "验机报告怎么看？属于哪个商家？"]
+    },
+    ord_002: {
+      id: "ORD-2026-002",
+      item: "索尼 FE 24-70mm GM II · 官方验",
+      scene: "官方验订单",
+      orderStatus: "运输异常 · 节点停滞 54h",
+      tradeStatus: "物流核实中",
+      lastAppeal: "催促派送",
+      ticket: "无（待触发疑似丢件工单）",
+      entryParam: "物流详情页 (logistics_trace)",
+      stallHours: 54,
+      unshippedHours: 0,
+      appealCount: 1,
+      logisticsNode: "包裹在【中转场】停留已达 54 小时无更新（超出常规时效阈值）",
+      inspectionResult: "官方验机通过 · 镜片通透无霉斑 · 归属商家：光影器材官方验仓 #B204",
+      guesses: ["我的包裹到哪了？是不是丢件了？", "包裹疑似丢失怎么建单核实？", "我要申请退款"]
+    },
+    ord_003: {
+      id: "ORD-2026-003",
+      item: "Switch OLED 日版 · 个人卖家",
+      scene: "普通 C2C 交易",
+      orderStatus: "已付款 · 待发货 (已等 78h)",
+      tradeStatus: "等待卖家发货",
+      lastAppeal: "催发货未果",
+      ticket: "无（满足主动取消触发条件）",
+      entryParam: "订单列表页 (order_list)",
+      stallHours: 0,
+      unshippedHours: 78,
+      appealCount: 1,
+      logisticsNode: "卖家尚未录入快递单号，已累计等待 78 小时",
+      inspectionResult: "普通 C2C 个人闲置商品，未接入官方验机服务（归属个人卖家：@玩家阿泽）",
+      guesses: ["卖家一直不发货怎么办？", "我要申请退款", "可以帮我外呼联系卖家吗？"]
+    },
+    ord_004: {
+      id: "ORD-2026-004",
+      item: "RTX 4070Ti 显卡 · 个人卖家",
+      scene: "C2C 交易纠纷",
+      orderStatus: "已签收 · 售后争议中",
+      tradeStatus: "买家第 3 次发起申诉",
+      lastAppeal: "反馈啸叫与描述不符（第 3 次申诉）",
+      ticket: "ARB-2026-889（待仲裁介入）",
+      entryParam: "售后申诉页 (dispute_detail)",
+      stallHours: 0,
+      unshippedHours: 0,
+      appealCount: 3,
+      logisticsNode: "已于昨日 14:20 签收",
+      inspectionResult: "普通 C2C 交易，买家已上传开箱视频与测试截图 3 份",
+      guesses: ["我申诉好几次了怎么处理？", "我要申请退款", "转人工客服"]
+    }
+  };
+
+  var KB_CHUNKS = [
+    {
+      id: "KB-LOG-01",
+      key: "logistics",
+      title: "标准问题 · 物流状态查询与停滞延伸处理",
+      scene: "全部订单 / 运输中加权",
+      version: "v2026.11（生效中）",
+      status: "fresh",
+      excerpt: "根据订单物流节点返回当前状态与停留时长；当节点停滞时长达到配置阈值（默认 48h）时，主动提示包裹疑似丢失与退款延伸问题，并支持自动生成工单转发网点部门核实。"
+    },
+    {
+      id: "KB-REF-02",
+      key: "refund",
+      title: "标准问题 · 官方验与 C2C 订单退款规范",
+      scene: "官方验订单 / 售后退款",
+      version: "v2026.11（生效中）",
+      status: "fresh",
+      excerpt: "官方验流程中的订单退款，需依次完成槽位收集：① 订单号（优先从上下文自动带入）② 退款原因；回显信息经用户二次确认后调用 apply_refund 接口，处理进度实时回写服务进度信息板。"
+    },
+    {
+      id: "KB-KG-03",
+      key: "inspection",
+      title: "知识图谱 · 官方验机报告与商家实体关系查询",
+      scene: "实体—属性—实体 二维查询",
+      version: "KG-Graph v4.2（实时同步）",
+      status: "fresh",
+      excerpt: "官方验商品详情、验机结论与手机所属商家属二维结构化关系，直接检索知识图谱返回【商品实体 → 验机结论 / 电池健康 / 所属商家】，不经过生成模型自由转述，防止张冠李戴。"
+    },
+    {
+      id: "KB-SHP-04",
+      key: "shipping",
+      title: "主动规则 · 卖家长时间未发货与外呼取消流程",
+      scene: "待发货订单 / 主动识别",
+      version: "v2026.11（生效中）",
+      status: "fresh",
+      excerpt: "卖家长时间未发货时，按等待时长达到阈值（默认 72h）触发主动处置：支持调用 call_seller 自动外呼卖家协商，或直接启动超时未发货取消交易与极速退款流程。"
+    },
+    {
+      id: "KB-ARB-05",
+      key: "arbitration",
+      title: "主动规则 · 同一 C2C 交易多次申诉触发仲裁介入",
+      scene: "C2C 纠纷 / 主动识别",
+      version: "v2026.11（生效中）",
+      status: "fresh",
+      excerpt: "同一 C2C 交易买家多次申诉达到限定次数（默认 3 次）时，系统自动触发平台仲裁介入，打包历史申诉凭证与聊天记录生成仲裁工单，并在服务进度信息板展示进度。"
+    }
+  ];
+
+  var AUTOMATION_FLOWS = {
+    lost_pkg: {
+      id: "lost_pkg",
+      kicker: "流程 01 · 物流查询延伸与自动建单闭环（来自原 PRD 场景 B）",
+      title: "包裹疑似丢失：从物流查询延伸 → 阈值核验 → 自动生成网点工单 → 超时回访",
+      steps: [
+        {
+          name: "01. 物流查询与延伸预判",
+          tool: "query_logistics",
+          summary: "用户查物流或进入物流页时，自动拉取最新轨迹并预判延伸诉求",
+          detail: "原 PRD 指出：用户在咨询物流时，延伸问题（包裹丢失、能否退款）才是智能客服壁垒。系统读取订单 ORD-2026-002 轨迹。",
+          payload: { event: "LOGISTICS_QUERY", order_id: "ORD-2026-002", last_hub: "华东中转场", stall_hours: 54 }
+        },
+        {
+          name: "02. 停留时长阈值核对",
+          tool: "rule_engine.check_stall",
+          summary: "对比实际停留时长与配置阈值，不凭用户一句话盲目建单",
+          detail: "",
+          payload: {}
+        },
+        {
+          name: "03. 自动生成核实工单",
+          tool: "create_ticket",
+          summary: "自动打包订单、物流单号、停留节点与会话摘要，派发网点核实",
+          detail: "调用 create_ticket 生成工单 TKT-2026-501，自动路由至【分拨网点核实组】，无需人工坐席手动抄单。",
+          payload: { tool: "create_ticket", ticket_id: "TKT-2026-501", dept: "分拨网点核实组", priority: "HIGH", attach_context: true }
+        },
+        {
+          name: "04. 服务进度信息板同步",
+          tool: "service_board.publish",
+          summary: "将工单状态、预计响应时间实时推送至客户端「服务进度信息板」",
+          detail: "用户可在聊天窗顶部「服务进度板」随时查看处理节点、补充凭证或一键催办，减少重复进线。",
+          payload: { board_update: "PUBLISHED", ticket_id: "TKT-2026-501", visible_to_user: true, step_status: "网点核实中" }
+        },
+        {
+          name: "05. 超容忍时长主动回访",
+          tool: "proactive_followup",
+          summary: "监控工单 SLA，超容忍时长未结案时主动触达用户并优先赔付/退款",
+          detail: "",
+          payload: {}
+        }
+      ]
+    },
+    unshipped: {
+      id: "unshipped",
+      kicker: "流程 02 · 主动识别规则 A（不等用户开口）",
+      title: "卖家长时间未发货：监控等待时长 → 自动外呼卖家 → 触发取消交易流程",
+      steps: [
+        {
+          name: "01. 交易状态巡检触发",
+          tool: "monitor.unshipped_scan",
+          summary: "后台扫描已付款待发货订单，定位异常延迟单 ORD-2026-003",
+          detail: "不等买家反复进线投诉，系统实时监控订单付款后未录入物流单号的累计时长（当前已等待 78 小时）。",
+          payload: { event: "UNSHIPPED_SCAN", order_id: "ORD-2026-003", waited_hours: 78 }
+        },
+        {
+          name: "02. 未发货时长阈值判定",
+          tool: "rule_engine.check_unshipped",
+          summary: "对比等待时长与可配置阈值，决定进入自动外呼或取消链路",
+          detail: "",
+          payload: {}
+        },
+        {
+          name: "03. C2B2C 自动外呼卖家",
+          tool: "call_seller",
+          summary: "调用智能语音外呼卖家确认发货意愿，并向买家透明展示外呼目的",
+          detail: "执行原 PRD「C2B2C 协商外呼」能力：自动外呼个人卖家 @玩家阿泽，若无人接听或确认无法发货则进入下一步。",
+          payload: { tool: "call_seller", seller_id: "USR-9921", call_result: "NO_ANSWER_OR_CANNOT_SHIP", notify_buyer: true }
+        },
+        {
+          name: "04. 触发取消交易与极速退款",
+          tool: "apply_refund",
+          summary: "按规则自动启动超时未发货取消交易，原路退回买家款项",
+          detail: "生成自动化处置单 TKT-2026-602，免除买家举证负担，担保资金原路退回。",
+          payload: { tool: "cancel_and_refund", order_id: "ORD-2026-003", ticket_id: "TKT-2026-602", refund_status: "PROCESSING" }
+        },
+        {
+          name: "05. 触达后解决率回流评估",
+          tool: "eval.log_proactive",
+          summary: "以「触达后问题解决率」而非单纯触达量评估主动服务效果",
+          detail: "记录本次主动服务闭环：买家无需二次找人工客服，计入主动识别有效解决样本。",
+          payload: { metric: "proactive_resolution", resolved_without_human: true, feedback_loop: "dataset_updated" }
+        }
+      ]
+    },
+    arbitration: {
+      id: "arbitration",
+      kicker: "流程 03 · 主动识别规则 B（C2C 纠纷升级护栏）",
+      title: "同一 C2C 交易买家多次申诉：次数达标 → 凭证归档 → 触发平台仲裁介入",
+      steps: [
+        {
+          name: "01. 申诉频次信号捕捉",
+          tool: "monitor.appeal_counter",
+          summary: "捕捉订单 ORD-2026-004 买家提交第 3 次售后申诉信号",
+          detail: "识别到买卖双方协商陷入僵局，避免机器人在常规问答里打转激化矛盾。",
+          payload: { event: "APPEAL_SUBMITTED", order_id: "ORD-2026-004", current_appeal_count: 3 }
+        },
+        {
+          name: "02. 申诉次数阈值判定",
+          tool: "rule_engine.check_appeal",
+          summary: "对比当前申诉次数与仲裁介入阈值配置",
+          detail: "",
+          payload: {}
+        },
+        {
+          name: "03. 证据链与会话摘要打包",
+          tool: "context.bundle_evidence",
+          summary: "汇总买卖双方历史聊天、3 次申诉图片视频与商品快照",
+          detail: "生成结构化案件摘要，确保仲裁专员接手时一目了然，用户无需重复提交材料。",
+          payload: { bundle_id: "EVD-4070TI", media_count: 3, chat_summary: "买家反馈显卡啸叫与描述不符，卖家拒绝退货" }
+        },
+        {
+          name: "04. 自动创建平台仲裁工单",
+          tool: "create_ticket",
+          summary: "升级至平台纠纷仲裁庭（ARB-2026-889），冻结交易打款",
+          detail: "调用 create_ticket 创建高优仲裁单并锁定担保交易款项，推送进度板。",
+          payload: { tool: "create_ticket", ticket_id: "ARB-2026-889", queue: "C2C_ARBITRATION_COURT", escrow_locked: true }
+        },
+        {
+          name: "05. 人工专员无缝接管",
+          tool: "transfer_human",
+          summary: "携带完整上下文路由至资深纠纷专员，安抚买家情绪",
+          detail: "客户端同步展示仲裁进度与预计裁决时效，完成机器到人工的零折损交接。",
+          payload: { tool: "transfer_human", handoff_context: "FULL", repeat_questions_saved: true }
+        }
+      ]
+    },
+    scrm_funnel: {
+      id: "scrm_funnel",
+      kicker: "流程 04 · 原 PRD 后半部分延展：私域 SCRM 协同",
+      title: "智能客服 × 私域 SCRM：统一知识库底座，「先解决、再培育转化」",
+      steps: [
+        {
+          name: "01. 售后问题高效一次解决",
+          tool: "cs_agent.resolve",
+          summary: "通过 RAG + Agent 快速解决用户的验机或物流咨询，建立信任",
+          detail: "原 PRD 核心逻辑：客服与私域共享底座，只有在服务体验断层被修复后，才具备私域转化基础。",
+          payload: { stage: "SERVICE_RESOLVED", satisfaction: "SATISFIED", trust_score: "HIGH" }
+        },
+        {
+          name: "02. 多触点合规一键加微",
+          tool: "scrm.add_wechat",
+          summary: "在服务完结页/订单页提供专属顾问企业微信名片（引流）",
+          detail: "携带用户画像标签（偏好品类：官方验数码）与历史交易记录，多终端打通客户档案。",
+          payload: { stage: "ACQUISITION", channel: "order_complete_card", tag: "官方验核心买家" }
+        },
+        {
+          name: "03. 统一知识库与 IM 会话助手",
+          tool: "scrm.im_copilot",
+          summary: "私域顾问在企微端共享同一套 RAG 知识库，一键推荐话术与验机报告",
+          detail: "避免客服与私域口径不一；IM 会话助手实时检索最新商品库与活动规则辅助顾问。",
+          payload: { stage: "NURTURING", shared_kb: "v2026.11", copilot_suggestion: "推送同款成色对比与以旧换新补贴" }
+        },
+        {
+          name: "04. 跟进计划与培育触达",
+          tool: "scrm.followup_plan",
+          summary: "按客户生命周期自动生成回访与换机提醒任务",
+          detail: "记录客户跟进轨迹，杜绝过度打扰。",
+          payload: { stage: "FOLLOW_UP", next_touch: "签收后 7 天成色回访" }
+        },
+        {
+          name: "05. 商机漏斗与丢单归因统计",
+          tool: "scrm.analytics",
+          summary: "闭环统计引流 → 培育 → 转化漏斗、跟进分析与丢单原因",
+          detail: "将私域未成交原因反哺给商品供应链与客服知识库。",
+          payload: { stage: "CONVERSION_ANALYTICS", funnel_tracked: true, loss_reason_synced: true }
+        }
+      ]
+    }
+  };
+
+  // ==========================================
+  // 2. APPLICATION STATE
+  // ==========================================
+  var state = {
+    activeTab: "workbench",
+    currentOrderKey: "ord_001",
+    slotStep: null,
+    slotOrderNo: "",
+    slotReason: "",
+    lastIntent: "",
+    repeatCount: 0,
+    tickets: [
+      { id: "HIST-2026-102", title: "发货时效咨询", status: "已完结", time: "昨日 18:20", detail: "系统自动回复预计发货时间，用户确认解决。" }
+    ],
+    metrics: {
+      totalSessions: 1,
+      validSessions: 1,
+      resolvedSessions: 1,
+      totalQuestions: 0,
+      matchedQuestions: 0,
+      exactMatchedQuestions: 0,
+      candidateShown: 0,
+      candidateClicked: 0,
+      keywordHumanTransfers: 0,
+      emotionHumanTransfers: 0,
+      otherHumanTransfers: 0
+    },
+    activeFlowKey: "lost_pkg",
+    flowStepIndex: 0,
+    flowTimer: null,
+    thresholds: {
+      stallHours: 48,
+      unshippedHours: 72,
+      appealCount: 3,
+      slaHours: 24
+    }
+  };
+
+  // ==========================================
+  // 3. DOM HELPERS & METRICS UPDATER
+  // ==========================================
+  function $(id) { return document.getElementById(id); }
+  function esc(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function updateMetricsRibbon() {
+    var m = state.metrics;
+    $("metricTotalSessions").textContent = m.totalSessions;
+    $("metricValidSessions").textContent = m.validSessions;
+    $("metricTotalQuestions").textContent = m.totalQuestions;
+
+    var matchRate = m.totalQuestions === 0 ? 100 : Math.round((m.matchedQuestions / m.totalQuestions) * 100);
+    var exactRate = m.matchedQuestions === 0 ? 100 : Math.round((m.exactMatchedQuestions / m.matchedQuestions) * 100);
+
+    var denom = m.validSessions - m.keywordHumanTransfers - m.emotionHumanTransfers;
+    var resRate = denom <= 0 ? 100 : Math.min(100, Math.max(0, Math.round((m.resolvedSessions / denom) * 100)));
+
+    $("metricMatchRate").textContent = matchRate + "%";
+    $("metricExactRate").textContent = exactRate + "%";
+    $("metricResolutionRate").textContent = resRate + "%";
+
+    var ord = ORDERS[state.currentOrderKey];
+    $("ribbonCurrentOrder").textContent = ord.id + " · " + ord.item;
+  }
+
+  // ==========================================
+  // 4. TAB 1: WORKBENCH & CHAT ENGINE
+  // ==========================================
+  function renderOrderContext() {
+    var ord = ORDERS[state.currentOrderKey];
+    var bar = $("contextSignalsBar");
+    var signals = [
+      ["订单号 / 商品", ord.id + " · " + ord.item],
+      ["订单状态", ord.orderStatus],
+      ["交易状态", ord.tradeStatus],
+      ["已有服务工单", ord.ticket],
+      ["上次诉求状态", ord.lastAppeal],
+      ["入口参数", ord.entryParam]
+    ];
+    bar.innerHTML = signals.map(function(s) {
+      return '<div class="p-2 rounded-xl bg-stone-50 border border-stone-200/80">' +
+        '<div class="text-[10px] font-semibold text-stone-400 uppercase">' + esc(s[0]) + '</div>' +
+        '<div class="font-semibold text-stone-800 truncate mt-0.5" title="' + esc(s[1]) + '">' + esc(s[1]) + '</div>' +
+      '</div>';
+    }).join("");
+
+    var chipsEl = $("predictedChips");
+    chipsEl.innerHTML = ord.guesses.map(function(q) {
+      return '<button type="button" data-guess="' + esc(q) + '" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-brand-500 text-brand-700 hover:bg-brand-600 hover:text-white transition">' +
+        esc(q) +
+      '</button>';
+    }).join("");
+
+    chipsEl.querySelectorAll("[data-guess]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        handleUserMessage(btn.getAttribute("data-guess"));
+      });
+    });
+
+    $("slotSceneVal").textContent = ord.scene;
+    updateMetricsRibbon();
+    renderServiceBoard();
+  }
+
+  function renderServiceBoard() {
+    $("ticketCountBadge").textContent = state.tickets.length;
+    var list = $("serviceBoardList");
+    if (state.tickets.length === 0) {
+      list.innerHTML = '<div class="text-stone-500">当前暂无服务工单记录。</div>';
+      return;
+    }
+    list.innerHTML = state.tickets.map(function(t) {
+      return '<div class="p-2.5 rounded-lg bg-white border border-amber-200 flex items-start justify-between gap-2">' +
+        '<div>' +
+          '<div class="font-bold text-stone-900">' + esc(t.id) + ' · ' + esc(t.title) + '</div>' +
+          '<div class="text-stone-600 mt-0.5">' + esc(t.detail) + '</div>' +
+        '</div>' +
+        '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 shrink-0">' + esc(t.status) + '</span>' +
+      '</div>';
+    }).join("");
+  }
+
+  function highlightPipelineNodes(activeIds, alertId, routeLabel) {
+    var allNodes = ["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag", "dag-out-agent", "dag-out-human"];
+    allNodes.forEach(function(id) {
+      var el = $(id);
+      if (!el) return;
+      el.classList.remove("node-active", "node-visited", "node-alert");
+    });
+    activeIds.forEach(function(id, idx) {
+      var el = $(id);
+      if (!el) return;
+      if (idx === activeIds.length - 1) {
+        el.classList.add("node-active");
+      } else {
+        el.classList.add("node-visited");
+      }
+    });
+    if (alertId && $(alertId)) {
+      $(alertId).classList.remove("node-active", "node-visited");
+      $(alertId).classList.add("node-alert");
+    }
+    $("activeRouteBadge").textContent = routeLabel || "管线已执行";
+  }
+
+  function updateSlotInspector(step, orderNo, reason, confirmed, toolName, payloadObj) {
+    $("agentStateBadge").textContent = step ? ("SLOT_FILLING: " + step.toUpperCase()) : "IDLE / READY";
+    $("slotOrderVal").textContent = orderNo ? orderNo : "未填槽";
+    $("slotOrderVal").className = orderNo ? "font-mono font-semibold text-emerald-700" : "font-mono text-stone-400";
+
+    $("slotReasonVal").textContent = reason ? reason : "未填槽";
+    $("slotReasonVal").className = reason ? "font-mono font-semibold text-emerald-700" : "font-mono text-stone-400";
+
+    $("slotConfirmVal").textContent = confirmed ? "已确认 ✓" : (step === "confirm" ? "等待用户确认..." : "待确认");
+    $("slotConfirmVal").className = confirmed ? "font-mono font-semibold text-emerald-700" : "font-mono text-amber-700";
+
+    if (toolName) {
+      $("lastToolName").textContent = toolName;
+    }
+    if (payloadObj) {
+      $("toolPayloadBox").textContent = JSON.stringify(payloadObj, null, 2);
+    }
+  }
+
+  function renderTraceSteps(steps, confidenceText, freshnessText) {
+    $("inspectorConfidence").textContent = confidenceText || "高 · 完全匹配";
+    if (freshnessText) {
+      $("inspectorFreshness").textContent = freshnessText;
+    }
+    $("inspectorRepeatCount").textContent = state.repeatCount + " / 3";
+
+    var list = $("traceList");
+    list.innerHTML = steps.map(function(s) {
+      return '<div class="p-3 rounded-xl border border-stone-200 bg-stone-50/70 text-xs">' +
+        '<div class="flex items-center justify-between font-bold text-stone-900">' +
+          '<span>' + esc(s[0]) + '</span>' +
+          '<span class="text-brand-600 font-mono text-[11px]">' + esc(s[1]) + '</span>' +
+        '</div>' +
+        '<p class="text-stone-600 mt-1 leading-relaxed">' + s[2] + '</p>' +
+      '</div>';
+    }).join("");
+  }
+
+  function appendChatBubble(role, htmlContent) {
+    var vp = $("chatViewport");
+    var wrap = document.createElement("div");
+    if (role === "user") {
+      wrap.className = "flex justify-end";
+      wrap.innerHTML = '<div class="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 text-white px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm">' + htmlContent + '</div>';
+    } else if (role === "transfer") {
+      wrap.className = "w-full";
+      wrap.innerHTML = '<div class="rounded-2xl bg-rose-50 border border-rose-200 p-3.5 text-xs sm:text-sm text-stone-800 leading-relaxed">' + htmlContent + '</div>';
+    } else {
+      wrap.className = "flex justify-start";
+      wrap.innerHTML = '<div class="max-w-[90%] rounded-2xl rounded-bl-sm bg-white border border-stone-200 px-3.5 py-2.5 text-xs sm:text-sm text-stone-800 leading-relaxed shadow-sm">' + htmlContent + '</div>';
+    }
+    vp.appendChild(wrap);
+    vp.scrollTop = vp.scrollHeight;
+    return wrap;
+  }
+
+  function classifyIntent(q) {
+    var t = q.replace(/\s+/g, "");
+    if (/2024|旧版|折旧费|15%/.test(t)) return "stale_policy";
+    if (/人工|转人工|投诉|生气|太差|垃圾|等太久/.test(t)) return "human";
+    if (/退款|退货|退钱/.test(t)) return "refund";
+    if (/丢件|丢失|核实工单|建单/.test(t)) return "lost_pkg";
+    if (/不发货|外呼|联系卖家/.test(t)) return "unshipped";
+    if (/物流|快递|包裹|到哪|到货|发货|配送/.test(t)) return "logistics";
+    if (/验机|验货|检测|报告|质检|商家/.test(t)) return "inspection";
+    if (/申诉|仲裁|纠纷|举报/.test(t)) return "arbitration";
+    if (/你好|您好|hi|hello|在吗/.test(t)) return "greeting";
+    return "low";
+  }
+
+  function triggerHumanTransfer(reasonTitle, categoryType, traceSteps) {
+    $("feedbackBar").classList.add("hidden");
+    var ord = ORDERS[state.currentOrderKey];
+
+    if (categoryType === "keyword") {
+      state.metrics.keywordHumanTransfers++;
+    } else if (categoryType === "emotion") {
+      state.metrics.emotionHumanTransfers++;
+    } else {
+      state.metrics.otherHumanTransfers++;
+      state.metrics.resolvedSessions = Math.max(0, state.metrics.resolvedSessions - 1);
+    }
+    updateMetricsRibbon();
+
+    var handoffPayload = {
+      tool: "transfer_human",
+      trigger_rule: reasonTitle,
+      order_id: ord.id,
+      order_status: ord.orderStatus,
+      last_intent: state.lastIntent || "未识别",
+      repeat_count: state.repeatCount,
+      context_attached: true
+    };
+    updateSlotInspector(null, state.slotOrderNo, state.slotReason, false, "transfer_human", handoffPayload);
+    highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank"], "dag-out-human", "护栏触发 · 已转人工坐席");
+    renderTraceSteps(traceSteps, "转人工路由", "生效中");
+
+    var html = '<div class="flex items-center justify-between font-bold text-rose-800 mb-1">' +
+        '<span>已为您快速转接人工客服 · ' + esc(reasonTitle) + '</span>' +
+        '<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-900">上下文零丢失</span>' +
+      '</div>' +
+      '<p class="text-xs text-stone-700 mt-1">已将以下组合信息同步给人工坐席，您无需从头重述：</p>' +
+      '<div class="mt-2 p-2 rounded-lg bg-white border border-rose-200 text-xs font-mono text-stone-700">' +
+        '订单: ' + esc(ord.id) + ' (' + esc(ord.orderStatus) + ') | 识别意图: ' + esc(state.lastIntent || "人工咨询") + ' | 已连问: ' + state.repeatCount + ' 次' +
+      '</div>';
+    appendChatBubble("transfer", html);
+  }
+
+  function sendBotResponse(textHtml, chunkId, traceSteps, confidenceLabel, options) {
+    options = options || {};
+    var chunk = KB_CHUNKS.find(function(c) { return c.id === chunkId; });
+    var inner = '<div class="space-y-2"><p>' + textHtml.replace(/\n/g, "<br/>") + '</p>';
+
+    if (chunk) {
+      inner += '<div class="mt-2 pt-2 border-t border-dashed border-stone-200 text-[11px] text-stone-500">' +
+        '<div class="flex items-center justify-between font-semibold text-stone-700">' +
+          '<span>引用溯源 · ' + esc(chunk.id) + ' (' + esc(chunk.title) + ')</span>' +
+          '<span class="text-emerald-700 font-mono">' + esc(chunk.version) + '</span>' +
+        '</div>' +
+        '<div class="mt-0.5 italic">“' + esc(chunk.excerpt) + '”</div>' +
+      '</div>';
+    }
+
+    if (options.actionButtons && options.actionButtons.length > 0) {
+      inner += '<div class="pt-1 flex flex-wrap gap-1.5">';
+      options.actionButtons.forEach(function(btn) {
+        inner += '<button type="button" data-bot-action="' + esc(btn.action) + '" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-50 border border-brand-500 text-brand-700 hover:bg-brand-600 hover:text-white transition">' +
+          esc(btn.label) +
+        '</button>';
+      });
+      inner += '</div>';
+    }
+
+    if (options.candidates && options.candidates.length > 0) {
+      inner += '<div class="pt-1 space-y-1.5" role="group" aria-label="候选标准问题">';
+      options.candidates.forEach(function(c) {
+        inner += '<button type="button" data-cand-q="' + esc(c.q) + '" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium bg-stone-50 hover:bg-brand-50 border border-stone-300 hover:border-brand-600 text-stone-800 transition flex items-center justify-between">' +
+          '<span>' + esc(c.label) + '</span>' +
+          '<span class="text-brand-600 font-bold">点选提问 →</span>' +
+        '</button>';
+      });
+      inner += '</div>';
+    }
+
+    inner += '</div>';
+    var bubbleEl = appendChatBubble("bot", inner);
+
+    bubbleEl.querySelectorAll("[data-cand-q]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        state.metrics.candidateClicked++;
+        handleUserMessage(b.getAttribute("data-cand-q"));
+      });
+    });
+
+    bubbleEl.querySelectorAll("[data-bot-action]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        var act = b.getAttribute("data-bot-action");
+        handleBotInlineAction(act);
+      });
+    });
+
+    renderTraceSteps(traceSteps, confidenceLabel, options.freshnessLabel || "生效中（未过期）");
+    $("feedbackBar").classList.remove("hidden");
+  }
+
+  function handleBotInlineAction(act) {
+    var ord = ORDERS[state.currentOrderKey];
+    if (act === "autofill_order") {
+      handleUserMessage(ord.id);
+    } else if (act === "reason_mismatch") {
+      handleUserMessage("商品与描述不符");
+    } else if (act === "reason_inspection") {
+      handleUserMessage("验机报告某项不满意");
+    } else if (act === "reason_mind") {
+      handleUserMessage("改变主意不想要了");
+    } else if (act === "confirm_refund_yes") {
+      handleUserMessage("确认提交退款");
+    } else if (act === "create_lost_ticket") {
+      var newTicketId = "TKT-2026-" + (500 + state.tickets.length + 1);
+      state.tickets.unshift({
+        id: newTicketId,
+        title: "疑似包裹丢失 · 网点核实单",
+        status: "网点核实中",
+        time: "刚刚",
+        detail: "关联订单 " + ord.id + "，节点停滞 " + ord.stallHours + "h，已自动派发分拨网点核实。"
+      });
+      renderServiceBoard();
+      $("serviceBoardPanel").classList.remove("hidden");
+      updateSlotInspector(null, ord.id, "疑似包裹丢失", true, "create_ticket", {
+        tool: "create_ticket",
+        ticket_id: newTicketId,
+        order_id: ord.id,
+        stall_hours: ord.stallHours,
+        assigned_dept: "分拨中心网点核实组"
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-agent"], null, "Agent 工具调用 · 自动建单成功");
+      sendBotResponse(
+        "已为您自动生成网点核实工单【" + newTicketId + "】（关联订单 " + ord.id + "），并转发分拨网点部门核实。我已同步打开顶部的「服务进度板」，超过容忍时长未联系时系统将主动回访您。",
+        "KB-LOG-01",
+        [
+          ["事实核验", "停留 " + ord.stallHours + "h", "达到疑似丢件阈值，允许调用建单接口。"],
+          ["工具调用", "create_ticket", "生成工单 " + newTicketId + " 并写入服务进度信息板。"],
+          ["跟进闭环", "SLA 监控启动", "超容忍时长未响应将自动升级并主动触达买家。"]
+        ],
+        "高 · Agent 建单闭环"
+      );
+    } else if (act === "call_seller_now") {
+      var callTicketId = "CALL-2026-" + (800 + state.tickets.length + 1);
+      state.tickets.unshift({
+        id: callTicketId,
+        title: "C2B2C 自动外呼催发货及取消保护",
+        status: "外呼执行中",
+        time: "刚刚",
+        detail: "关联订单 " + ord.id + "，已等待 " + ord.unshippedHours + "h，系统正自动外呼卖家确认发货。"
+      });
+      renderServiceBoard();
+      $("serviceBoardPanel").classList.remove("hidden");
+      updateSlotInspector(null, ord.id, "超时未发货", true, "call_seller", {
+        tool: "call_seller",
+        task_id: callTicketId,
+        order_id: ord.id,
+        waited_hours: ord.unshippedHours,
+        fallback_action: "auto_cancel_order"
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-agent"], null, "Agent 工具调用 · C2B2C 自动外呼");
+      sendBotResponse(
+        "已为您触发 C2B2C 自动外呼卖家（任务号：" + callTicketId + "），外呼目的与进度已同步至顶部「服务进度板」。若卖家未接听或超时仍不发货，将直接为您执行取消交易与极速退款。",
+        "KB-SHP-04",
+        [
+          ["主动规则匹配", "等待 " + ord.unshippedHours + "h", "满足卖家长时间未发货干预条件。"],
+          ["工具调用", "call_seller", "发起自动外呼并在服务进度板向买家透明展示外呼目的。"]
+        ],
+        "高 · Agent 外呼编排"
+      );
+    }
+  }
+
+  function handleUserMessage(rawText) {
+    var q = String(rawText || "").trim();
+    if (!q) return;
+
+    var ord = ORDERS[state.currentOrderKey];
+    $("feedbackBar").classList.add("hidden");
+
+    if (q === "__repeat_3x__") {
+      appendChatBubble("user", "我的包裹到哪了？（第 3 次连续追问）");
+      state.metrics.totalQuestions++;
+      state.repeatCount = 3;
+      state.lastIntent = "物流查询";
+      triggerHumanTransfer("规则 ④ · 同一问题连续咨询达到限定次数 (3次)", "other", [
+        ["意图识别", "物流查询 · 第 3 次", "同一标准问题在本会话内连续出现 3 次，命中原 PRD「多次同问转人工」规则。"],
+        ["上下文信号", ord.id, "重复提问说明前两次标准答案未能解决用户的实际卡点。"],
+        ["护栏决策", "停止复读 · 转人工", "拒绝机械重复同一段话，立即携带完整上下文转接人工坐席。"]
+      ]);
+      return;
+    }
+
+    appendChatBubble("user", esc(q));
+    state.metrics.totalQuestions++;
+
+    // Multi-turn Agent Slot-Filling State Machine
+    if (state.slotStep === "order_no") {
+      state.slotOrderNo = q;
+      state.slotStep = "reason";
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      updateSlotInspector("reason", state.slotOrderNo, "", false, "slot_collector", {
+        agent_state: "AWAITING_REFUND_REASON",
+        filled_slots: { biz_scene: ord.scene, order_no: state.slotOrderNo },
+        missing_slots: ["refund_reason", "user_confirm"]
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-out-agent"], null, "Agent 填槽中 (1/2 已完成)");
+
+      sendBotResponse(
+        "已记录订单号：【" + esc(state.slotOrderNo) + "】（业务场景：" + esc(ord.scene) + "）。\n第 2 步：请告诉我您的退款原因（可点击下方常用原因快捷填入，或直接打字输入）：",
+        "KB-REF-02",
+        [
+          ["填槽进度 1/2", "order_no ✓", "已写入槽位 order_no = " + esc(state.slotOrderNo) + "。"],
+          ["工具护栏", "暂不调用接口", "缺失退款原因与用户二次确认前，严禁提前调用 apply_refund。"]
+        ],
+        "高 · Agent 多轮填槽",
+        {
+          actionButtons: [
+            { action: "reason_mismatch", label: "原因：商品与描述不符" },
+            { action: "reason_inspection", label: "原因：验机报告某项不满意" },
+            { action: "reason_mind", label: "原因：改变主意不想要了" }
+          ]
+        }
+      );
+      return;
+    }
+
+    if (state.slotStep === "reason") {
+      state.slotReason = q;
+      state.slotStep = "confirm";
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      updateSlotInspector("confirm", state.slotOrderNo, state.slotReason, false, "awaiting_confirmation", {
+        agent_state: "AWAITING_USER_CONFIRMATION",
+        filled_slots: { biz_scene: ord.scene, order_no: state.slotOrderNo, refund_reason: state.slotReason },
+        irreversible_guard: "REQUIRE_EXPLICIT_CONFIRM"
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-out-agent"], null, "Agent 填槽齐全 · 等待二次确认");
+
+      sendBotResponse(
+        "两项必填槽位已齐备，请核对以下退款申请摘要：\n• 订单编号：" + esc(state.slotOrderNo) + "\n• 业务场景：" + esc(ord.scene) + "\n• 退款原因：" + esc(state.slotReason) + "\n• 预计处理：提交后即时生成售后服务单并回写本会话。\n\n涉及订单与资金操作，请点击下方「确认提交退款」或输入「确认」以执行接口调用：",
+        "KB-REF-02",
+        [
+          ["填槽进度 2/2", "refund_reason ✓", "已写入槽位 refund_reason = " + esc(state.slotReason) + "。"],
+          ["不可逆操作护栏", "强制二次确认", "按原 PRD 可逆程度排序，调用退款接口前必须回显参数并由用户确认。"]
+        ],
+        "高 · 待二次确认",
+        {
+          actionButtons: [
+            { action: "confirm_refund_yes", label: "✓ 确认提交退款 (调用 apply_refund)" }
+          ]
+        }
+      );
+      return;
+    }
+
+    if (state.slotStep === "confirm") {
+      if (/确认|提交|好|是|行|可以|yes|ok/i.test(q)) {
+        var finalOrder = state.slotOrderNo || ord.id;
+        var finalReason = state.slotReason || "用户自助申请退款";
+        state.slotStep = null;
+        state.metrics.matchedQuestions++;
+        state.metrics.exactMatchedQuestions++;
+        updateMetricsRibbon();
+
+        var refTicketId = "REF-2026-" + (300 + state.tickets.length + 1);
+        state.tickets.unshift({
+          id: refTicketId,
+          title: "官方验/担保订单退款申请",
+          status: "审核退款中",
+          time: "刚刚",
+          detail: "订单 " + finalOrder + " | 原因：" + finalReason + " | 接口 apply_refund 已回写会话。"
+        });
+        renderServiceBoard();
+        $("serviceBoardPanel").classList.remove("hidden");
+
+        var apiPayload = {
+          tool: "apply_refund",
+          status: "SUCCESS_SIMULATED",
+          service_ticket: refTicketId,
+          params: {
+            order_no: finalOrder,
+            biz_scene: ord.scene,
+            reason: finalReason,
+            confirmed_by_user: true
+          }
+        };
+        updateSlotInspector(null, finalOrder, finalReason, true, "apply_refund", apiPayload);
+        highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-agent"], null, "Agent 执行完毕 · 已调 apply_refund");
+
+        sendBotResponse(
+          "退款申请提交成功！\n• 服务单号：【" + refTicketId + "】\n• 关联订单：" + esc(finalOrder) + "\n• 退款原因：" + esc(finalReason) + "\n\n结果已回写至当前会话，并同步至顶部「服务进度信息板」。若超过容忍时长未处理，系统将主动触达您。",
+          "KB-REF-02",
+          [
+            ["二次确认通过", "user_confirm = true", "用户已明确确认回显参数。"],
+            ["工具调用", "apply_refund", "成功提交退款并生成服务单 " + refTicketId + "。"],
+            ["跟进闭环", "服务进度板更新", "用户可在服务进度信息板实时查看退款到账节点。"]
+          ],
+          "高 · Agent 闭环完成"
+        );
+        return;
+      } else {
+        state.slotStep = null;
+      }
+    }
+
+    // Standard NLU + RAG + Guardrail Routing
+    var intent = classifyIntent(q);
+
+    if (intent === state.lastIntent && intent !== "greeting" && intent !== "low" && intent !== "human") {
+      state.repeatCount++;
+    } else {
+      state.repeatCount = (intent === "low" || intent === "human") ? 0 : 1;
+    }
+
+    if (state.repeatCount >= 3) {
+      triggerHumanTransfer("规则 ④ · 同一问题连续咨询达到限定次数 (3次)", "other", [
+        ["意图识别", "连续重复提问 3 次", "监测到用户对同一意图连续提问 3 次，命中原 PRD 转人工规则 ④。"],
+        ["护栏决策", "停止机器复读", "自动中断机器人回答并携带上下文转交人工客服。"]
+      ]);
+      return;
+    }
+
+    state.lastIntent = intent;
+
+    if (intent === "human") {
+      var isEmotion = /生气|太差|垃圾|等太久|投诉/.test(q);
+      triggerHumanTransfer(
+        isEmotion ? "规则 ⑤ · 负向情绪识别转人工" : "规则 ① · 预设拦截词直转人工",
+        isEmotion ? "emotion" : "keyword",
+        [
+          ["意图与情绪识别", isEmotion ? "负向情绪信号" : "预设拦截词命中", "输入包含「" + esc(q) + "」，第一优先级触发人工路由。"],
+          ["解决率分母修正", "已剔除主动/情绪转人工", "按原 PRD 公式，此类转人工从解决率分母中扣除，客观评估机器人表现。"]
+        ]
+      );
+      return;
+    }
+
+    if (intent === "stale_policy") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag"], null, "Freshness 护栏生效 · 拦截过期规则");
+      updateSlotInspector(null, ord.id, "", false, "rag_freshness_guard", {
+        query: q,
+        dropped_stale_chunk: "KB-OLD-99 (v2024.03 已废止)",
+        active_chunk: "KB-REF-02 (v2026.11 生效中)"
+      });
+      sendBotResponse(
+        "【Freshness 规则核验提醒】您提到的“官方验退货预扣 15% 折旧费”属于已废止的旧版历史规则（v2024.03），系统检索重排时已自动将其降权屏蔽。\n\n按当前最新生效的《v2026.11 官方验与 C2C 订单退款规范》，官方验订单申请退款无需预付折旧费，只需确认【订单号】与【退款原因】即可在线自助办理。需要现在帮您办理退款吗？",
+        "KB-REF-02",
+        [
+          ["混合检索", "召回 2 个候选片段", "同时召回 KB-OLD-99 (v2024.03) 与 KB-REF-02 (v2026.11)。"],
+          ["Freshness 过滤", "丢弃过期片段 KB-OLD-99", "检测到 KB-OLD-99 已过期，强制拦截，防止用旧政策误导用户。"],
+          ["带引用回答", "绑定 KB-REF-02", "仅采用最新生效版本生成回答。"]
+        ],
+        "高 · Freshness 护栏拦截",
+        {
+          freshnessLabel: "已拦截 1 条过期规则 (KB-OLD-99)",
+          actionButtons: [{ action: "autofill_order", label: "立即按新规办理退款" }]
+        }
+      );
+      return;
+    }
+
+    if (intent === "refund") {
+      state.slotStep = "order_no";
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      updateSlotInspector("order_no", "", "", false, "init_refund_agent", {
+        intent: "apply_refund",
+        detected_context_order: ord.id,
+        biz_scene: ord.scene,
+        next_required_slot: "order_no"
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-agent"], null, "进入 Agent 退款填槽状态机");
+
+      sendBotResponse(
+        "好的，帮您办理退款。系统识别当前业务场景为【" + esc(ord.scene) + "】。\n按规范需依次核对「订单号」与「退款原因」两项槽位（一次只问一项，避免信息过载）。\n\n第 1 步：请确认要退款的订单号（已为您从当前上下文预提取：" + esc(ord.id) + "，可直接点击下方按钮带入）：",
+        "KB-REF-02",
+        [
+          ["意图识别 + 场景", "退款 · " + ord.scene, "结合上下文区分官方验与普通 C2C 规则，避免套错流程。"],
+          ["Agent 状态机启动", "填槽 0/2 → 等待订单号", "优先从上下文提取候选订单号，支持一键带入。"]
+        ],
+        "高 · 启动多轮填槽",
+        {
+          actionButtons: [
+            { action: "autofill_order", label: "使用当前订单号：" + ord.id }
+          ]
+        }
+      );
+      return;
+    }
+
+    if (intent === "logistics" || intent === "lost_pkg") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      var isStalled = ord.stallHours >= state.thresholds.stallHours;
+      updateSlotInspector(null, ord.id, "", false, "query_logistics", {
+        tool: "query_logistics",
+        order_id: ord.id,
+        status: ord.orderStatus,
+        stall_hours: ord.stallHours,
+        threshold_hours: state.thresholds.stallHours,
+        suspected_lost: isStalled
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag"], null, isStalled ? "RAG + 疑似丢件延伸触发" : "RAG 高置信带引用回答");
+
+      var replyText = "为您查到订单【" + esc(ord.id) + "】的最新物流状态：\n• 当前状态：" + esc(ord.orderStatus) + "\n• 最新轨迹：" + esc(ord.logisticsNode);
+      var actions = [];
+
+      if (isStalled) {
+        replyText += "\n\n⚠️ 【延伸问题主动识别】系统检测到您的包裹在中转节点已停滞 " + ord.stallHours + " 小时（超出 " + state.thresholds.stallHours + "h 阈值），符合「疑似丢失」核实条件。您可以一键生成核实工单转发网点排查，或直接申请退款：";
+        actions.push({ action: "create_lost_ticket", label: "⚡ 一键生成网点核实工单 (create_ticket)" });
+      } else {
+        replyText += "\n\n延伸问题预判：您可能还关心「如果包裹一直不到/疑似丢失怎么办？」或「能不能直接申请退款？」，可随时点击下方按钮操作。";
+      }
+
+      sendBotResponse(
+        replyText,
+        "KB-LOG-01",
+        [
+          ["意图识别", "物流状态查询", "完全匹配标准问题，置信度：高。"],
+          ["混合检索 + 重排", "命中 KB-LOG-01", "订单处于运输阶段，物流类片段重排权重置顶。"],
+          ["工具调用", "query_logistics", "实测节点停留 " + ord.stallHours + "h（阈值 " + state.thresholds.stallHours + "h），" + (isStalled ? "触发疑似丢失自动建单分支。" : "未超阈值，正常展示轨迹。")]
+        ],
+        "高 · 完全匹配",
+        { actionButtons: actions }
+      );
+      return;
+    }
+
+    if (intent === "unshipped") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      var isOverWait = ord.unshippedHours >= state.thresholds.unshippedHours;
+      updateSlotInspector(null, ord.id, "", false, "query_order", {
+        tool: "query_order",
+        order_id: ord.id,
+        waited_hours: ord.unshippedHours,
+        threshold_hours: state.thresholds.unshippedHours,
+        can_auto_cancel: isOverWait
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag"], null, "RAG + 发货时效主动规则");
+
+      var shipText = "订单【" + esc(ord.id) + "】当前状态：" + esc(ord.orderStatus) + "。\n按平台《发货时效与主动识别规范》，卖家累计未发货达 " + state.thresholds.unshippedHours + " 小时将触发自动外呼协商与超时取消交易流程。";
+      var shipActions = [];
+      if (isOverWait) {
+        shipText += "\n\n⚡ 当前订单已等待 " + ord.unshippedHours + " 小时（已达标），您可以立即触发「自动外呼卖家」或直接办理退款：";
+        shipActions.push({ action: "call_seller_now", label: "📞 一键触发自动外呼卖家 (call_seller)" });
+      } else {
+        shipActions.push({ action: "call_seller_now", label: "📞 模拟触发自动外呼卖家 (call_seller)" });
+      }
+
+      sendBotResponse(
+        shipText,
+        "KB-SHP-04",
+        [
+          ["意图识别", "发货时效与催发货", "命中标准问题 KB-SHP-04，置信度：高。"],
+          ["主动规则核对", "已等待 " + ord.unshippedHours + "h", "对比未发货阈值 " + state.thresholds.unshippedHours + "h，提供自动外呼卖家与取消交易工具。"]
+        ],
+        "高 · 完全匹配",
+        { actionButtons: shipActions }
+      );
+      return;
+    }
+
+    if (intent === "inspection") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      updateSlotInspector(null, ord.id, "", false, "kg_entity_query", {
+        tool: "knowledge_graph.query",
+        entity_id: ord.id,
+        relations: ["HAS_INSPECTION_REPORT", "BELONGS_TO_MERCHANT"],
+        result: ord.inspectionResult
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag"], null, "二维知识图谱直出 (0 幻觉)");
+
+      sendBotResponse(
+        "【知识图谱结构化查询结果】\n• 关联商品：" + esc(ord.item) + "\n• 验机与商家结论：" + esc(ord.inspectionResult) + "\n\n验机报告阅读指引：先看结论页「通过 / 异常项」，再看外观、功能、电池等分项说明。此类「实体—属性—实体」二维查询直接由知识图谱返回结构化事实，不经生成模型自由发挥。",
+        "KB-KG-03",
+        [
+          ["意图识别", "二维实体关系查询", "识别到「商品 → 验机结论 / 所属商家」属性查询。"],
+          ["知识图谱检索", "命中 KB-KG-03", "走知识图谱精确返回实体属性，绕过自由文本生成，杜绝张冠李戴。"]
+        ],
+        "高 · 知识图谱直出"
+      );
+      return;
+    }
+
+    if (intent === "arbitration") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+
+      updateSlotInspector(null, ord.id, "", false, "query_dispute", {
+        tool: "query_dispute",
+        order_id: ord.id,
+        appeal_count: ord.appealCount,
+        threshold: state.thresholds.appealCount,
+        arbitration_triggered: ord.appealCount >= state.thresholds.appealCount
+      });
+      highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank", "dag-out-rag"], null, "RAG + 申诉仲裁规则匹配");
+
+      sendBotResponse(
+        "关于交易申诉与仲裁：\n同一 C2C 交易买家累计申诉达到 " + state.thresholds.appealCount + " 次时，系统会自动触发平台仲裁介入。\n• 当前订单（" + esc(ord.id) + "）累计申诉次数：" + ord.appealCount + " 次\n• 当前工单状态：" + esc(ord.ticket) + "\n\n所有申诉进度均在顶部「服务进度板」实时展示，超过容忍时长未联系时专员将主动回访您。",
+        "KB-ARB-05",
+        [
+          ["意图识别", "申诉与仲裁规则", "命中标准问题 KB-ARB-05，置信度：高。"],
+          ["护栏约束", "不违规承诺裁决结果", "严格依据工单实际状态回复，不编造具体赔付金额与裁决结果。"]
+        ],
+        "高 · 完全匹配"
+      );
+      return;
+    }
+
+    if (intent === "greeting") {
+      state.metrics.matchedQuestions++;
+      state.metrics.exactMatchedQuestions++;
+      updateMetricsRibbon();
+      highlightPipelineNodes(["dag-input", "dag-intent"], null, "闲聊问候 · 情绪安抚与预判引导");
+      sendBotResponse(
+        "您好！我是二手电商 C2C 智能客服助手。结合您当前的订单【" + esc(ord.id) + " · " + esc(ord.orderStatus) + "】，我已经为您预判了上方 3 个最可能遇到的问题；您也可以直接问物流、办退款、查验机报告，答不上来时我会给出候选问题或快速帮您转人工。",
+        null,
+        [
+          ["意图识别", "问候 / 闲聊型", "按原 PRD 规范，闲聊型仅做礼貌回应与预判引导，不触发知识生成。"]
+        ],
+        "高 · 闲聊引导"
+      );
+      return;
+    }
+
+    // Low Similarity -> 1-3 Candidate Standard Questions
+    state.metrics.matchedQuestions++;
+    state.metrics.candidateShown++;
+    updateMetricsRibbon();
+
+    updateSlotInspector(null, ord.id, "", false, "fallback_candidates", {
+      query: q,
+      similarity_tier: "LOW_OR_MEDIUM",
+      hallucination_guard: "BLOCKED_FREE_GENERATION",
+      candidates_returned: 3
+    });
+    highlightPipelineNodes(["dag-input", "dag-intent", "dag-retrieve", "dag-rerank"], "dag-out-human", "低相似度兜底 · 返回 3 个候选问题");
+
+    sendBotResponse(
+      "这个问题在当前知识库中没有足够把握的标准答案。秉承「宁可不答，不能答错」原则，我不直接猜测政策或金额。\n\n为您匹配了以下 3 个最接近的标准问题，点选即可查看精准解答；或者您也可以直接点击「一键转人工」：",
+      null,
+      [
+        ["意图与相似度判定", "未达直接回答阈值", "混合检索最高片段得分低于安全阈值，置信度：低。"],
+        ["输出护栏拦截", "禁止模型自由编造", "拦截无引用生成（幻觉率控制 = 0%）。"],
+        ["候选问题推荐", "弹出 3 个标准问题", "按原 PRD 相似匹配机制给出 1–3 个候选标准问题，点击计入「候选采纳率」。"]
+      ],
+      "低 · 候选问题兜底",
+      {
+        candidates: [
+          { q: "我的包裹到哪了？", label: "候选 1 · 我的包裹到哪了？（物流轨迹与异常停滞处理）" },
+          { q: "我要申请退款", label: "候选 2 · 我要申请退款（官方验/担保交易多轮自助退）" },
+          { q: "卖家一直不发货怎么办？", label: "候选 3 · 卖家一直不发货怎么办？（超时外呼与取消交易）" }
+        ]
+      }
+    );
+  }
+
+  function resetChatSession() {
+    var vp = $("chatViewport");
+    vp.innerHTML = "";
+    state.slotStep = null;
+    state.slotOrderNo = "";
+    state.slotReason = "";
+    state.lastIntent = "";
+    state.repeatCount = 0;
+    $("feedbackBar").classList.add("hidden");
+
+    var ord = ORDERS[state.currentOrderKey];
+    updateSlotInspector(null, "", "", false, "none", {
+      status: "session_initialized",
+      current_order: ord.id,
+      scene: ord.scene
+    });
+    highlightPipelineNodes(["dag-input"], null, "会话就绪 · 等待用户输入");
+
+    renderTraceSteps([
+      ["01 上下文加载", ord.id, "已自动读取订单状态（" + esc(ord.orderStatus) + "）、上次诉求与入口参数，生成顶部 3 条「猜你想问」。"],
+      ["02 护栏就绪", "检索式优先", "每一次回答均强制校验知识片段引用与 Freshness；支持多轮退款填槽与 5 类转人工规则。"]
+    ], "就绪", "生效中（未过期）");
+
+    appendChatBubble(
+      "bot",
+      "您好！已接入当前测试订单【<b>" + esc(ord.id) + " · " + esc(ord.item) + "</b>】（状态：" + esc(ord.orderStatus) + "）。<br/>您可以直接点击上方「<b>猜你想问</b>」或下方「<b>一键验证用例</b>」，实时体验 RAG 引用溯源、Agent 填槽办退款以及转人工护栏。"
+    );
+  }
+
+  // ==========================================
+  // 5. TAB 2: PROACTIVE AUTOMATION ENGINE
+  // ==========================================
+  function getDynamicStepDetail(flowKey, stepIdx) {
+    var flow = AUTOMATION_FLOWS[flowKey];
+    var step = flow.steps[stepIdx];
+    var th = state.thresholds;
+
+    if (flowKey === "lost_pkg" && stepIdx === 1) {
+      var triggered = 54 >= th.stallHours;
+      return {
+        detail: "当前测试单（ORD-2026-002）物流停滞 54 小时，对比左侧配置阈值（" + th.stallHours + "h）：" +
+          (triggered ? "【已达阈值 ✓】判定为疑似丢失，自动放行进入下一步建单！" : "【未达阈值 ✕】当前阈值设为 " + th.stallHours + "h > 54h，暂不建单，继续监控。"),
+        payload: { check: "stall_hours >= threshold", actual_hours: 54, configured_threshold: th.stallHours, passed: triggered }
+      };
+    }
+    if (flowKey === "lost_pkg" && stepIdx === 4) {
+      return {
+        detail: "已为工单 TKT-2026-501 设定容忍时长 SLA = " + th.slaHours + " 小时。若网点超过 " + th.slaHours + "h 未联系买家，自动触发升级回访与先行赔付审理。",
+        payload: { tool: "sla_watcher", ticket_id: "TKT-2026-501", tolerance_hours: th.slaHours, auto_escalate: true }
+      };
+    }
+    if (flowKey === "unshipped" && stepIdx === 1) {
+      var passUnship = 78 >= th.unshippedHours;
+      return {
+        detail: "当前测试单（ORD-2026-003）已等待 78 小时，对比配置阈值（" + th.unshippedHours + "h）：" +
+          (passUnship ? "【已达阈值 ✓】立即触发 C2B2C 自动外呼卖家与超时取消保护！" : "【未达阈值 ✕】当前阈值设为 " + th.unshippedHours + "h > 78h，保持常规提醒。"),
+        payload: { check: "waited_hours >= threshold", actual_hours: 78, configured_threshold: th.unshippedHours, passed: passUnship }
+      };
+    }
+    if (flowKey === "arbitration" && stepIdx === 1) {
+      var passArb = 3 >= th.appealCount;
+      return {
+        detail: "当前测试单（ORD-2026-004）买家已累计申诉 3 次，对比配置阈值（" + th.appealCount + " 次）：" +
+          (passArb ? "【已达阈值 ✓】自动升级为平台仲裁介入，打包凭证并锁定交易款！" : "【未达阈值 ✕】当前阈值设为 " + th.appealCount + " 次 > 3 次，继续双边协商。"),
+        payload: { check: "appeal_count >= threshold", actual_count: 3, configured_threshold: th.appealCount, passed: passArb }
+      };
+    }
+    return { detail: step.detail, payload: step.payload };
+  }
+
+  function renderAutomationCanvas() {
+    var flow = AUTOMATION_FLOWS[state.activeFlowKey];
+    $("flowHeaderKicker").textContent = flow.kicker;
+    $("flowHeaderTitle").textContent = flow.title;
+
+    var container = $("flowStepsContainer");
+    container.innerHTML = flow.steps.map(function(s, idx) {
+      var stepNum = idx + 1;
+      var isCurrent = state.flowStepIndex === stepNum;
+      var isDone = state.flowStepIndex > stepNum;
+      var cls = "border-stone-200 bg-stone-50 text-stone-700";
+      var badge = "待执行";
+      if (isCurrent) {
+        cls = "node-active border-brand-600 bg-brand-50 text-stone-900";
+        badge = "执行中 ●";
+      } else if (isDone) {
+        cls = "node-visited border-emerald-600 bg-emerald-50/40 text-stone-900";
+        badge = "已完成 ✓";
+      }
+
+      return '<button type="button" data-step-jump="' + stepNum + '" class="text-left p-3.5 rounded-xl border-2 transition flex flex-col justify-between ' + cls + '">' +
+        '<div>' +
+          '<div class="flex items-center justify-between text-[11px] font-mono mb-1">' +
+            '<span class="font-bold text-brand-700">' + esc(s.tool) + '</span>' +
+            '<span>' + badge + '</span>' +
+          '</div>' +
+          '<div class="font-bold text-xs sm:text-sm text-stone-900">' + esc(s.name) + '</div>' +
+          '<p class="text-xs text-stone-600 mt-1 leading-relaxed">' + esc(s.summary) + '</p>' +
+        '</div>' +
+      '</button>';
+    }).join("");
+
+    container.querySelectorAll("[data-step-jump]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        stopFlowTimer();
+        state.flowStepIndex = parseInt(btn.getAttribute("data-step-jump"), 10);
+        renderAutomationCanvas();
+      });
+    });
+
+    if (state.flowStepIndex === 0) {
+      $("flowStepIndexBadge").textContent = "Step 0 / 5 (未启动)";
+      $("flowStatusPill").textContent = "就绪 · 点击上方「一键自动运行」或「单步推进」";
+      $("flowStatusPill").className = "text-xs font-semibold px-3 py-1 rounded-full bg-stone-100 text-stone-700";
+      $("flowStepNarrative").textContent = "点击任意步骤卡片或「一键自动运行当前流程」，实时查看该节点如何结合左侧阈值配置执行自动化动作。";
+      $("flowApiTag").textContent = "IDLE";
+      $("flowJsonOutput").textContent = JSON.stringify({ workflow_id: flow.id, status: "ready_to_run", thresholds: state.thresholds }, null, 2);
+    } else {
+      var activeIdx = state.flowStepIndex - 1;
+      var activeStep = flow.steps[activeIdx];
+      var dyn = getDynamicStepDetail(state.activeFlowKey, activeIdx);
+      $("flowStepIndexBadge").textContent = "Step " + state.flowStepIndex + " / 5 · " + activeStep.name;
+      $("flowStatusPill").textContent = state.flowStepIndex === 5 ? "✓ 全流程闭环执行完毕" : ("正在执行 Step " + state.flowStepIndex + "...");
+      $("flowStatusPill").className = state.flowStepIndex === 5
+        ? "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800"
+        : "text-xs font-semibold px-3 py-1 rounded-full bg-brand-100 text-brand-800";
+      $("flowStepNarrative").textContent = dyn.detail;
+      $("flowApiTag").textContent = activeStep.tool.toUpperCase();
+      $("flowJsonOutput").textContent = JSON.stringify(dyn.payload, null, 2);
+    }
+  }
+
+  function stopFlowTimer() {
+    if (state.flowTimer) {
+      clearInterval(state.flowTimer);
+      state.flowTimer = null;
+    }
+  }
+
+  function startAutoFlow() {
+    stopFlowTimer();
+    state.flowStepIndex = 1;
+    renderAutomationCanvas();
+    state.flowTimer = setInterval(function() {
+      if (state.flowStepIndex < 5) {
+        state.flowStepIndex++;
+        renderAutomationCanvas();
+      } else {
+        stopFlowTimer();
+      }
+    }, 950);
+  }
+
+  // ==========================================
+  // 6. NAVIGATION & EVENT BINDINGS
+  // ==========================================
+  function switchTab(tabId) {
+    state.activeTab = tabId;
+    document.querySelectorAll(".tab-panel").forEach(function(panel) {
+      panel.classList.toggle("hidden", panel.id !== "tab-" + tabId);
+    });
+    document.querySelectorAll(".nav-tab").forEach(function(btn) {
+      var active = btn.getAttribute("data-tab") === tabId;
+      btn.className = active
+        ? "nav-tab px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-brand-600 text-white shadow-sm"
+        : "nav-tab px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition whitespace-nowrap text-stone-700 hover:bg-stone-200/70";
+    });
+  }
+
+  function initEvents() {
+    document.querySelectorAll(".nav-tab").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        switchTab(btn.getAttribute("data-tab"));
+      });
+    });
+
+    $("orderSelect").addEventListener("change", function(e) {
+      state.currentOrderKey = e.target.value;
+      state.metrics.totalSessions++;
+      state.metrics.validSessions++;
+      state.metrics.resolvedSessions++;
+      renderOrderContext();
+      resetChatSession();
+    });
+
+    $("resetSessionBtn").addEventListener("click", function() {
+      resetChatSession();
+    });
+
+    $("toggleServiceBoardBtn").addEventListener("click", function() {
+      $("serviceBoardPanel").classList.toggle("hidden");
+    });
+    $("closeServiceBoardBtn").addEventListener("click", function() {
+      $("serviceBoardPanel").classList.add("hidden");
+    });
+
+    $("directHumanBtn").addEventListener("click", function() {
+      handleUserMessage("转人工客服");
+    });
+
+    $("chatForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      var input = $("chatInput");
+      var q = input.value;
+      input.value = "";
+      handleUserMessage(q);
+    });
+
+    document.querySelectorAll(".quick-trigger").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        handleUserMessage(btn.getAttribute("data-quick"));
+      });
+    });
+
+    $("fbSolvedBtn").addEventListener("click", function() {
+      $("feedbackBar").classList.add("hidden");
+      appendChatBubble("bot", "感谢您的认可！本轮会话已按「有效会话解决量」计入 PRD 解决率统计。如还有其他问题欢迎继续提问。");
+      renderTraceSteps([
+        ["用户满意度评价", "满意 / 已解决", "计入会话参评率与解决量口径，无需触发人工复盘。"]
+      ], "已解决闭环", "生效中");
+    });
+
+    $("fbUnsolvedBtn").addEventListener("click", function() {
+      triggerHumanTransfer("规则 ⑤ · 答案差评触发转人工与复盘队列", "other", [
+        ["用户满意度评价", "不满意 / 未解决", "命中原 PRD「答案差评转人工」规则。"],
+        ["回流闭环", "写入离线评测复盘队列", "本轮未解决会话已自动归档至待修订知识库样本池。"]
+      ]);
+    });
+
+    document.querySelectorAll(".flow-card").forEach(function(card) {
+      card.addEventListener("click", function() {
+        stopFlowTimer();
+        state.activeFlowKey = card.getAttribute("data-flow");
+        state.flowStepIndex = 0;
+        document.querySelectorAll(".flow-card").forEach(function(c) {
+          var isSel = c.getAttribute("data-flow") === state.activeFlowKey;
+          c.className = isSel
+            ? "flow-card text-left p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/60 transition"
+            : "flow-card text-left p-3.5 rounded-xl border-2 border-stone-200 bg-white hover:border-stone-300 transition";
+        });
+        renderAutomationCanvas();
+      });
+    });
+
+    $("runFullFlowBtn").addEventListener("click", function() {
+      startAutoFlow();
+    });
+    $("stepFlowBtn").addEventListener("click", function() {
+      stopFlowTimer();
+      state.flowStepIndex = state.flowStepIndex < 5 ? state.flowStepIndex + 1 : 1;
+      renderAutomationCanvas();
+    });
+    $("resetFlowBtn").addEventListener("click", function() {
+      stopFlowTimer();
+      state.flowStepIndex = 0;
+      renderAutomationCanvas();
+    });
+
+    $("syncToWorkbenchBtn").addEventListener("click", function() {
+      var flow = AUTOMATION_FLOWS[state.activeFlowKey];
+      var syncId = "AUTO-2026-" + (700 + state.tickets.length + 1);
+      state.tickets.unshift({
+        id: syncId,
+        title: flow.title.split("：")[0],
+        status: "自动化流已执行",
+        time: "刚刚",
+        detail: "由【主动识别与自动化引擎】触发执行完毕，结果已同步至客户端服务进度板。"
+      });
+      renderServiceBoard();
+      switchTab("workbench");
+      $("serviceBoardPanel").classList.remove("hidden");
+    });
+
+    $("paramStallHours").addEventListener("input", function(e) {
+      state.thresholds.stallHours = parseInt(e.target.value, 10);
+      $("paramStallHoursVal").textContent = state.thresholds.stallHours + "h";
+      renderAutomationCanvas();
+    });
+    $("paramUnshippedHours").addEventListener("input", function(e) {
+      state.thresholds.unshippedHours = parseInt(e.target.value, 10);
+      $("paramUnshippedHoursVal").textContent = state.thresholds.unshippedHours + "h";
+      renderAutomationCanvas();
+    });
+    $("paramAppealCount").addEventListener("input", function(e) {
+      state.thresholds.appealCount = parseInt(e.target.value, 10);
+      $("paramAppealCountVal").textContent = state.thresholds.appealCount + " 次";
+      renderAutomationCanvas();
+    });
+    $("paramSlaHours").addEventListener("input", function(e) {
+      state.thresholds.slaHours = parseInt(e.target.value, 10);
+      $("paramSlaHoursVal").textContent = state.thresholds.slaHours + "h";
+      renderAutomationCanvas();
+    });
+  }
+
+  initEvents();
+  renderOrderContext();
+  resetChatSession();
+  renderAutomationCanvas();
+})();
+</script>
+</body>
+</html>
